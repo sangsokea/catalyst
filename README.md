@@ -95,6 +95,47 @@ If you wish to contribute to Catalyst or develop against our runtime or compiler
 [building from source](https://docs.pennylane.ai/projects/catalyst/en/latest/dev/installation.html#minimal-building-from-source-guide)
 are also available.
 
+## Building the custom QASM 3.0 translator
+
+The `pip install pennylane-catalyst` wheel above does **not** include the
+custom OpenQASM 3.0 emission target (`quantum-translate --mlir-to-qasm3`)
+that lives in this fork — see
+[`mlir/lib/Target/OpenQASM3/TranslateToQASM3.cpp`](mlir/lib/Target/OpenQASM3/TranslateToQASM3.cpp)
+and the registration in
+[`mlir/tools/quantum-translate/quantum-translate.cpp`](mlir/tools/quantum-translate/quantum-translate.cpp).
+Anything that consumes our QASM 3 lowering (e.g. the QuFlow integration) must
+build the binaries from source.
+
+Quick start on Ubuntu 22.04:
+
+```bash
+# 1. System + pip prerequisites
+sudo apt-get install -y clang cmake ninja-build ccache lld zlib1g-dev gcc-12 g++-12
+pip install --user 'pybind11>=2.10' 'nanobind>=2.9' 'cmake>=3.26' typing_extensions 'numpy>2.0.0'
+export PATH="$HOME/.local/bin:$PATH"
+
+# 2. Submodules + build (~50 min cold, ~1 min incremental)
+git submodule update --init --recursive
+./build-logs/build_all.sh
+
+# 3. Verify (must pass 160/160)
+cmake --build mlir/build --target check-dialects -j 18
+
+# 4. End-to-end Qiskit -> QASM 3 round-trip
+pip install --user qiskit
+python3 circuit_to_qasm3.py demos/bell.py    # or any Qiskit .py file
+```
+
+The driver script encodes the per-phase compiler and flag overrides we need
+on Ubuntu (g++-12 only for `dialects`, `STRICT_WARNINGS=OFF` to dodge a GCC 12
+false-positive `-Wrestrict`, etc.). For the full recipe, the rationale behind
+each fix, the smoke tests, the install-to-`/opt/quflow/bin/` step, and the
+troubleshooting table, see [**`BUILD_QASM3.md`**](BUILD_QASM3.md).
+
+For what the translator pipeline actually emits (mid-circuit measurement,
+control flow, examples), see
+[`DYNAMIC_CIRCUIT_EXECUTION_FLOW.md`](DYNAMIC_CIRCUIT_EXECUTION_FLOW.md).
+
 ## Trying Catalyst with PennyLane
 
 To get started using the Catalyst JIT compiler from Python, check out our [quick start
